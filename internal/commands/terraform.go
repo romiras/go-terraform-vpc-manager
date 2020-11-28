@@ -2,20 +2,19 @@ package commands
 
 import (
 	"context"
-	"fmt"
-	"os"
 
 	"github.com/hashicorp/terraform-exec/tfexec"
 	"github.com/hashicorp/terraform-exec/tfinstall"
+	"github.com/romiras/go-terraform-vpc-manager/internal/helpers"
+	registry "github.com/romiras/go-terraform-vpc-manager/internal/registries"
 )
 
 const DefaultExecPath = "/usr/bin/terraform"
-const workingDir = "/home/romiras/Devel/devops/terraform-vpc-docker-helloworld"
 
 type ExecFinder struct{}
 
 func (ef *ExecFinder) ExecPath(ctx context.Context) (string, error) {
-	return DefaultExecPath, nil
+	return registry.Reg.ExecPath, nil
 }
 
 func varOpt(instanceTagNamePrefix string) *tfexec.VarOption {
@@ -29,14 +28,11 @@ func targetOption(instanceFullTagName string) *tfexec.TargetOption {
 	return tfexec.Target(resource)
 }
 
-func tfPrepare(workingDir string) *tfexec.Terraform {
+func tfPrepare() *tfexec.Terraform {
 	execPath, err := tfinstall.Find(context.Background(), &ExecFinder{})
-	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
-	}
+	helpers.AbortOnError(err)
 
-	tf, err := tfexec.NewTerraform(workingDir, execPath)
+	tf, err := tfexec.NewTerraform(registry.Reg.WorkingDir, execPath)
 	if err != nil {
 		panic(err)
 	}
@@ -49,18 +45,24 @@ func tfPrepare(workingDir string) *tfexec.Terraform {
 	return tf
 }
 
-func CreateInstance(name string) error {
-	fmt.Println("CreateInstance: " + name)
+func CreateVPC(instanceName string) error {
+	helpers.DebugMsg("CreateVPC: " + instanceName)
 
-	tf := tfPrepare(workingDir)
-	return tf.Apply(context.Background(), varOpt(name))
+	tf := tfPrepare()
+	if instanceName != "" {
+		return tf.Apply(context.Background(), varOpt(instanceName))
+	}
+	return tf.Apply(context.Background())
 }
 
-func DestroyInstance(name string) error {
-	fmt.Println("DestroyInstance: " + name)
+func DestroyVPC(instanceName string) error {
+	helpers.DebugMsg("DestroyVPC: " + instanceName)
 
-	tf := tfPrepare(workingDir)
-	return tf.Destroy(context.Background(), targetOption(name))
+	tf := tfPrepare()
+	if instanceName != "" {
+		return tf.Destroy(context.Background(), targetOption(instanceName))
+	}
+	return tf.Destroy(context.Background())
 }
 
 /*
