@@ -16,6 +16,7 @@ limitations under the License.
 package cmd
 
 import (
+	"errors"
 	"path/filepath"
 	"strings"
 
@@ -68,6 +69,8 @@ var cmdCreate = &cobra.Command{
 
 		instanceName := getInstanceName(cmd, args)
 		workingDir := getWorkingDir(cmd, args)
+		err := validate(instanceName, workingDir)
+		helpers.AbortOnError(err)
 
 		registry.Reg.WorkingDir = workingDir
 
@@ -83,11 +86,25 @@ var cmdDestroy = &cobra.Command{
 
 		instanceName := getInstanceName(cmd, args)
 		workingDir := getWorkingDir(cmd, args)
+		err := validate(instanceName, workingDir)
+		helpers.AbortOnError(err)
 
 		registry.Reg.WorkingDir = workingDir
 
 		return commands.DestroyVPC(instanceName)
 	},
+}
+
+func validate(instanceName, workingDir string) error {
+	if instanceName == "" {
+		return errors.New("Got empty instance name")
+	}
+
+	if workingDir == "" {
+		return errors.New("Got empty working directory")
+	}
+
+	return nil
 }
 
 func setSubCmdFlags(cmd *cobra.Command) {

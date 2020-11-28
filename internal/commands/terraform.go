@@ -2,6 +2,7 @@ package commands
 
 import (
 	"context"
+	"os"
 
 	"github.com/hashicorp/terraform-exec/tfexec"
 	"github.com/hashicorp/terraform-exec/tfinstall"
@@ -29,13 +30,16 @@ func targetOption(instanceFullTagName string) *tfexec.TargetOption {
 }
 
 func tfPrepare() *tfexec.Terraform {
+	_, err := os.Stat(registry.Reg.WorkingDir)
+	if os.IsNotExist(err) {
+		helpers.AbortOnError(err)
+	}
+
 	execPath, err := tfinstall.Find(context.Background(), &ExecFinder{})
 	helpers.AbortOnError(err)
 
 	tf, err := tfexec.NewTerraform(registry.Reg.WorkingDir, execPath)
-	if err != nil {
-		panic(err)
-	}
+	helpers.AbortOnError(err)
 
 	// err = tf.Init(context.Background(), tfexec.Upgrade(true), tfexec.LockTimeout("60s"))
 	// if err != nil {
