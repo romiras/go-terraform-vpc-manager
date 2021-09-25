@@ -1,4 +1,4 @@
-package registry
+package registries
 
 var Reg *Registry
 
