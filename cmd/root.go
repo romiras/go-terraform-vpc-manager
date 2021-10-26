@@ -16,10 +16,12 @@ limitations under the License.
 package cmd
 
 import (
+	"context"
 	"errors"
 	"path/filepath"
 	"strings"
 
+	"github.com/hashicorp/terraform-exec/tfinstall"
 	"github.com/spf13/cobra"
 
 	homedir "github.com/mitchellh/go-homedir"
@@ -31,7 +33,15 @@ import (
 
 const AppName = "go-terraform-vpc-manager"
 
+const DefaultExecPath = "/usr/bin/terraform"
+
 var cfgFile string
+
+type ExecFinder struct{}
+
+func (ef *ExecFinder) ExecPath(ctx context.Context) (string, error) {
+	return registry.Reg.ExecPath, nil
+}
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -124,9 +134,30 @@ func Execute() {
 	helpers.AbortOnError(err)
 }
 
+func getTerraformExecPath() string {
+	var execPath string
+	var err error
+
+	tfConfig := viper.GetStringMapString("terraform")
+	if tfConfig != nil {
+		execPath = tfConfig["exec_path"]
+	} else {
+		execPath = DefaultExecPath
+	}
+
+	if execPath == "" {
+		if execPath, err = tfinstall.Find(context.TODO(), &ExecFinder{}); err != nil {
+			execPath = DefaultExecPath
+		}
+	}
+
+	return execPath
+}
+
 func init() {
 	initConfig()
-	registry.Reg.ExecPath = viper.GetStringMapString("terraform")["exec_path"]
+
+	registry.Reg.ExecPath = getTerraformExecPath()
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.config/"+AppName+"/settings.yaml)")
 }

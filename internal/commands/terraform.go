@@ -5,22 +5,9 @@ import (
 	"os"
 
 	"github.com/hashicorp/terraform-exec/tfexec"
-	"github.com/hashicorp/terraform-exec/tfinstall"
 	"github.com/romiras/go-terraform-vpc-manager/internal/helpers"
 	registry "github.com/romiras/go-terraform-vpc-manager/internal/registries"
 )
-
-const DefaultExecPath = "/usr/bin/terraform"
-
-type ExecFinder struct{}
-
-func (ef *ExecFinder) ExecPath(ctx context.Context) (string, error) {
-	return registry.Reg.ExecPath, nil
-}
-
-func varOpt(instanceTagNamePrefix string) *tfexec.VarOption {
-	return tfexec.Var("instance_tag_name=" + instanceTagNamePrefix)
-}
 
 // See https://github.com/hashicorp/terraform/issues/12917#issuecomment-437861756
 func targetOption(instanceFullTagName string) *tfexec.TargetOption {
@@ -29,40 +16,54 @@ func targetOption(instanceFullTagName string) *tfexec.TargetOption {
 	return tfexec.Target(resource)
 }
 
-func tfPrepare() *tfexec.Terraform {
+func tfPrepare() (*tfexec.Terraform, error) {
 	_, err := os.Stat(registry.Reg.WorkingDir)
 	if os.IsNotExist(err) {
 		helpers.AbortOnError(err)
 	}
 
-	execPath, err := tfinstall.Find(context.Background(), &ExecFinder{})
-	helpers.AbortOnError(err)
+	tf, err := tfexec.NewTerraform(registry.Reg.WorkingDir, registry.Reg.ExecPath)
+	if err != nil {
+		return nil, err
+	}
 
-	tf, err := tfexec.NewTerraform(registry.Reg.WorkingDir, execPath)
-	helpers.AbortOnError(err)
-
-	// err = tf.Init(context.Background(), tfexec.Upgrade(true), tfexec.LockTimeout("60s"))
-	// if err != nil {
-	// 	panic(err)
-	// }
-
-	return tf
+	return tf, nil
 }
 
 func CreateVPC(instanceName string) error {
 	helpers.DebugMsg("CreateVPC: " + instanceName)
 
-	tf := tfPrepare()
-	if instanceName != "" {
-		return tf.Apply(context.Background(), varOpt(instanceName))
+	tf, err := tfPrepare()
+	if err != nil {
+		return err
 	}
-	return tf.Apply(context.Background())
+
+	initOptions := []tfexec.InitOption{
+		// tfexec.Upgrade(true),
+		// tfexec.LockTimeout("60s"),
+	}
+
+	err = tf.Init(context.Background(), initOptions...)
+	if err != nil {
+		return err
+	}
+
+	applyOptions := make([]tfexec.ApplyOption, 0)
+	if instanceName != "" {
+		applyOptions = append(applyOptions, tfexec.Var("instance_tag_name="+instanceName))
+	}
+
+	return tf.Apply(context.Background(), applyOptions...)
 }
 
 func DestroyVPC(instanceName string) error {
 	helpers.DebugMsg("DestroyVPC: " + instanceName)
 
-	tf := tfPrepare()
+	tf, err := tfPrepare()
+	if err != nil {
+		return err
+	}
+
 	if instanceName != "" {
 		return tf.Destroy(context.Background(), targetOption(instanceName))
 	}
