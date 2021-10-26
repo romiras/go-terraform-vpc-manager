@@ -43,7 +43,7 @@ func CreateVPC(instanceName string) error {
 		// tfexec.LockTimeout("60s"),
 	}
 
-	err = tf.Init(context.Background(), initOptions...)
+	err = tf.Init(context.TODO(), initOptions...)
 	if err != nil {
 		return err
 	}
@@ -53,7 +53,7 @@ func CreateVPC(instanceName string) error {
 		applyOptions = append(applyOptions, tfexec.Var("instance_tag_name="+instanceName))
 	}
 
-	return tf.Apply(context.Background(), applyOptions...)
+	return tf.Apply(context.TODO(), applyOptions...)
 }
 
 func DestroyVPC(instanceName string) error {
@@ -64,10 +64,12 @@ func DestroyVPC(instanceName string) error {
 		return err
 	}
 
+	destroyOptions := make([]tfexec.DestroyOption, 0)
 	if instanceName != "" {
-		return tf.Destroy(context.Background(), targetOption(instanceName))
+		destroyOptions = append(destroyOptions, targetOption(instanceName))
 	}
-	return tf.Destroy(context.Background())
+
+	return tf.Destroy(context.TODO(), destroyOptions...)
 }
 
 /*
